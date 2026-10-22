@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Placement Records</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Bhavitha College Placement Management System</h1>
+        <p>Placement Records</p>
+    </header>
+
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="students.html">Students</a>
+        <a href="companies.html">Companies</a>
+        <a href="applications.html">Applications</a>
+        <a href="placements.html">Placements</a>
+    </nav>
+
+    <main>
+        <h2>Selected Students</h2>
+
+        <p>
+            This page displays students whose application status is
+            marked as Selected.
+        </p>
+
+        <button type="button" id="refreshPlacements">
+            Refresh Placements
+        </button>
+
+        <p id="placementMessage" role="status"></p>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student ID</th>
+                        <th>Student Name</th>
+                        <th>Roll Number</th>
+                        <th>Branch</th>
+                        <th>Company</th>
+                        <th>Job Role</th>
+                        <th>Package (LPA)</th>
+                        <th>Drive Date</th>
+                    </tr>
+                </thead>
+                <tbody id="placementTableBody"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const tableBody = document.getElementById("placementTableBody");
+        const message = document.getElementById("placementMessage");
+
+        async function loadPlacements() {
+            message.textContent = "Loading placement records...";
+
+            try {
+                const response = await fetch("/api/placements");
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message || "Could not load placement records."
+                    );
+                }
+
+                tableBody.replaceChildren();
+
+                if (data.length === 0) {
+                    message.textContent = "No selected students yet.";
+                    return;
+                }
+
+                data.forEach(placement => {
+                    const row = document.createElement("tr");
+
+                    [
+                        placement.student_id,
+                        placement.student_name,
+                        placement.roll_no,
+                        placement.branch,
+                        placement.company_name,
+                        placement.job_role,
+                        placement.package,
+                        placement.drive_date
+                            ? String(placement.drive_date).slice(0, 10)
+                            : ""
+                    ].forEach(value => {
+                        const cell = document.createElement("td");
+                        cell.textContent = value ?? "";
+                        row.appendChild(cell);
+                    });
+
+                    tableBody.appendChild(row);
+                });
+
+                message.textContent =
+                    "Placement records loaded: " + data.length;
+            } catch (error) {
+                message.textContent = error.message;
+            }
+        }
+
+        document.getElementById("refreshPlacements")
+            .addEventListener("click", loadPlacements);
+
+        loadPlacements();
+    </script>
+
+</body>
+</html>

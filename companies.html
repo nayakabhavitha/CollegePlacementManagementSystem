@@ -1,0 +1,236 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companies Management</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Bhavitha College Placement Management System</h1>
+        <p>Companies Management</p>
+    </header>
+
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="students.html">Students</a>
+        <a href="companies.html">Companies</a>
+        <a href="applications.html">Applications</a>
+        <a href="placements.html">Placements</a>
+    </nav>
+
+    <main>
+        <h2>Company Details</h2>
+
+        <form id="companyForm">
+            <input type="hidden" id="company_id">
+
+            <label for="company_name">Company Name</label>
+            <input type="text" id="company_name" required>
+
+            <label for="job_role">Job Role</label>
+            <input type="text" id="job_role" required>
+
+            <label for="package">Package (LPA)</label>
+            <input type="number" id="package" min="0" step="0.01" required>
+
+            <label for="eligibility_cgpa">Required CGPA</label>
+            <input type="number" id="eligibility_cgpa"
+                   min="0" max="10" step="0.01" required>
+
+            <label for="drive_date">Drive Date</label>
+            <input type="date" id="drive_date" required>
+
+            <button type="submit" id="companySubmit">
+                Add Company
+            </button>
+            <button type="button" id="cancelEdit" hidden>
+                Cancel Edit
+            </button>
+        </form>
+
+        <p id="companyMessage" role="status"></p>
+
+        <h2>Company List</h2>
+
+        <button type="button" id="refreshCompanies">
+            Refresh Companies
+        </button>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Company Name</th>
+                        <th>Job Role</th>
+                        <th>Package (LPA)</th>
+                        <th>Required CGPA</th>
+                        <th>Drive Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="companyTableBody"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const companyForm = document.getElementById("companyForm");
+        const companyMessage = document.getElementById("companyMessage");
+        const companyTableBody = document.getElementById("companyTableBody");
+        const companySubmit = document.getElementById("companySubmit");
+        const cancelEdit = document.getElementById("cancelEdit");
+
+        function showMessage(message) {
+            companyMessage.textContent = message;
+        }
+
+        function resetForm() {
+            companyForm.reset();
+            document.getElementById("company_id").value = "";
+            companySubmit.textContent = "Add Company";
+            cancelEdit.hidden = true;
+        }
+
+        async function loadCompanies() {
+            try {
+                const response = await fetch("/api/companies");
+                const companies = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(companies.message || "Could not load companies.");
+                }
+
+                companyTableBody.replaceChildren();
+
+                companies.forEach(company => {
+                    const row = document.createElement("tr");
+
+                    [
+                        company.company_id,
+                        company.company_name,
+                        company.job_role,
+                        company.package,
+                        company.eligibility_cgpa,
+                        company.drive_date
+                            ? String(company.drive_date).slice(0, 10)
+                            : ""
+                    ].forEach(value => {
+                        const cell = document.createElement("td");
+                        cell.textContent = value ?? "";
+                        row.appendChild(cell);
+                    });
+
+                    const actions = document.createElement("td");
+
+                    const editButton = document.createElement("button");
+                    editButton.textContent = "Edit";
+                    editButton.type = "button";
+                    editButton.addEventListener("click", () => {
+                        document.getElementById("company_id").value =
+                            company.company_id;
+                        document.getElementById("company_name").value =
+                            company.company_name;
+                        document.getElementById("job_role").value =
+                            company.job_role;
+                        document.getElementById("package").value =
+                            company.package;
+                        document.getElementById("eligibility_cgpa").value =
+                            company.eligibility_cgpa;
+                        document.getElementById("drive_date").value =
+                            company.drive_date
+                                ? String(company.drive_date).slice(0, 10)
+                                : "";
+
+                        companySubmit.textContent = "Update Company";
+                        cancelEdit.hidden = false;
+                        showMessage("Editing company ID " + company.company_id);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    });
+
+                    const deleteButton = document.createElement("button");
+                    deleteButton.textContent = "Delete";
+                    deleteButton.type = "button";
+                    deleteButton.addEventListener("click", async () => {
+                        if (!confirm("Delete this company?")) return;
+
+                        try {
+                            const result = await fetch(
+                                "/api/companies/" + company.company_id,
+                                { method: "DELETE" }
+                            );
+                            const data = await result.json();
+
+                            if (!result.ok) {
+                                throw new Error(data.message || "Delete failed.");
+                            }
+
+                            showMessage(data.message || "Company deleted.");
+                            await loadCompanies();
+                        } catch (error) {
+                            showMessage(error.message);
+                        }
+                    });
+
+                    actions.append(editButton, deleteButton);
+                    row.appendChild(actions);
+                    companyTableBody.appendChild(row);
+                });
+            } catch (error) {
+                showMessage("Companies could not be loaded. " + error.message);
+            }
+        }
+
+        companyForm.addEventListener("submit", async event => {
+            event.preventDefault();
+
+            const id = document.getElementById("company_id").value;
+            const company = {
+                company_name: document.getElementById("company_name").value.trim(),
+                job_role: document.getElementById("job_role").value.trim(),
+                package: document.getElementById("package").value,
+                eligibility_cgpa: document.getElementById("eligibility_cgpa").value,
+                drive_date: document.getElementById("drive_date").value
+            };
+
+            try {
+                const response = await fetch(
+                    id ? "/api/companies/" + id : "/api/companies",
+                    {
+                        method: id ? "PUT" : "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(company)
+                    }
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || "Could not save company.");
+                }
+
+                showMessage(data.message || "Company saved successfully.");
+                resetForm();
+                await loadCompanies();
+            } catch (error) {
+                showMessage(error.message);
+            }
+        });
+
+        cancelEdit.addEventListener("click", () => {
+            resetForm();
+            showMessage("Edit cancelled.");
+        });
+
+        document.getElementById("refreshCompanies")
+            .addEventListener("click", loadCompanies);
+
+        loadCompanies();
+    </script>
+
+</body>
+</html>

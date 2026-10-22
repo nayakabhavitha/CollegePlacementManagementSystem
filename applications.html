@@ -1,0 +1,315 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Applications</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1> Bhavitha College Placement Management System</h1>
+        <p>Student Applications</p>
+    </header>
+
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="students.html">Students</a>
+        <a href="companies.html">Companies</a>
+        <a href="applications.html">Applications</a>
+        <a href="placements.html">Placements</a>
+    </nav>
+
+    <main>
+        <h2>Apply for a Company</h2>
+
+        <form id="applicationForm">
+            <input type="hidden" id="application_id">
+
+            <label for="student_id">Select Student</label>
+            <select id="student_id" required>
+                <option value="">Select Student</option>
+            </select>
+
+            <label for="company_id">Select Company</label>
+            <select id="company_id" required>
+                <option value="">Select Company</option>
+            </select>
+
+            <label for="applied_date">Application Date</label>
+            <input type="date" id="applied_date" required>
+
+            <label for="round">Placement Round</label>
+            <select id="round" required>
+                <option value="Applied">Applied</option>
+                <option value="Aptitude Test">Aptitude Test</option>
+                <option value="Technical Interview">Technical Interview</option>
+                <option value="HR Interview">HR Interview</option>
+                <option value="Completed">Completed</option>
+            </select>
+
+            <label for="status">Application Status</label>
+            <select id="status" required>
+                <option value="Applied">Applied</option>
+                <option value="Shortlisted">Shortlisted</option>
+                <option value="Selected">Selected</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+
+            <button type="submit" id="applicationSubmit">
+                Add Application
+            </button>
+
+            <button type="button" id="cancelApplicationEdit" hidden>
+                Cancel Edit
+            </button>
+        </form>
+
+        <p id="applicationMessage" role="status"></p>
+
+        <h2>Application Records</h2>
+
+        <button type="button" id="refreshApplications">
+            Refresh Applications
+        </button>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Student</th>
+                        <th>Company</th>
+                        <th>Application Date</th>
+                        <th>Round</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="applicationTableBody"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const form = document.getElementById("applicationForm");
+        const message = document.getElementById("applicationMessage");
+        const tableBody = document.getElementById("applicationTableBody");
+        const submitButton = document.getElementById("applicationSubmit");
+        const cancelButton = document.getElementById("cancelApplicationEdit");
+
+        function showMessage(text) {
+            message.textContent = text;
+        }
+
+        function resetForm() {
+            form.reset();
+            document.getElementById("application_id").value = "";
+            submitButton.textContent = "Add Application";
+            cancelButton.hidden = true;
+        }
+
+        async function loadOptions() {
+            try {
+                const [studentResponse, companyResponse] = await Promise.all([
+                    fetch("/api/students"),
+                    fetch("/api/companies")
+                ]);
+
+                const students = await studentResponse.json();
+                const companies = await companyResponse.json();
+
+                if (!studentResponse.ok || !companyResponse.ok) {
+                    throw new Error("Could not load students or companies.");
+                }
+
+                const studentSelect = document.getElementById("student_id");
+                const companySelect = document.getElementById("company_id");
+
+                studentSelect.replaceChildren(
+                    new Option("Select Student", "")
+                );
+                companySelect.replaceChildren(
+                    new Option("Select Company", "")
+                );
+
+                students.forEach(student => {
+                    studentSelect.add(
+                        new Option(
+                            `${student.name} (${student.roll_no})`,
+                            student.student_id
+                        )
+                    );
+                });
+
+                companies.forEach(company => {
+                    companySelect.add(
+                        new Option(
+                            `${company.company_name} - ${company.job_role}`,
+                            company.company_id
+                        )
+                    );
+                });
+            } catch (error) {
+                showMessage(error.message);
+            }
+        }
+
+        async function loadApplications() {
+            try {
+                const response = await fetch("/api/applications");
+                const applications = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        applications.message || "Could not load applications."
+                    );
+                }
+
+                tableBody.replaceChildren();
+
+                applications.forEach(application => {
+                    const row = document.createElement("tr");
+
+                    [
+                        application.application_id,
+                        application.student_name,
+                        application.company_name,
+                        application.applied_date
+                            ? String(application.applied_date).slice(0, 10)
+                            : "",
+                        application.round,
+                        application.status
+                    ].forEach(value => {
+                        const cell = document.createElement("td");
+                        cell.textContent = value ?? "";
+                        row.appendChild(cell);
+                    });
+
+                    const actions = document.createElement("td");
+
+                    const editButton = document.createElement("button");
+                    editButton.type = "button";
+                    editButton.textContent = "Edit";
+                    editButton.addEventListener("click", async () => {
+                        await loadOptions();
+
+                        document.getElementById("application_id").value =
+                            application.application_id;
+                        document.getElementById("student_id").value =
+                            application.student_id;
+                        document.getElementById("company_id").value =
+                            application.company_id;
+                        document.getElementById("applied_date").value =
+                            application.applied_date
+                                ? String(application.applied_date).slice(0, 10)
+                                : "";
+                        document.getElementById("round").value =
+                            application.round;
+                        document.getElementById("status").value =
+                            application.status;
+
+                        submitButton.textContent = "Update Application";
+                        cancelButton.hidden = false;
+                        showMessage(
+                            "Editing application ID " +
+                            application.application_id
+                        );
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    });
+
+                    const deleteButton = document.createElement("button");
+                    deleteButton.type = "button";
+                    deleteButton.textContent = "Delete";
+                    deleteButton.addEventListener("click", async () => {
+                        if (!confirm("Delete this application?")) return;
+
+                        try {
+                            const result = await fetch(
+                                "/api/applications/" +
+                                application.application_id,
+                                { method: "DELETE" }
+                            );
+                            const data = await result.json();
+
+                            if (!result.ok) {
+                                throw new Error(
+                                    data.message || "Delete failed."
+                                );
+                            }
+
+                            showMessage(
+                                data.message || "Application deleted."
+                            );
+                            await loadApplications();
+                        } catch (error) {
+                            showMessage(error.message);
+                        }
+                    });
+
+                    actions.append(editButton, deleteButton);
+                    row.appendChild(actions);
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                showMessage(error.message);
+            }
+        }
+
+        form.addEventListener("submit", async event => {
+            event.preventDefault();
+
+            const id = document.getElementById("application_id").value;
+
+            const application = {
+                student_id: document.getElementById("student_id").value,
+                company_id: document.getElementById("company_id").value,
+                applied_date: document.getElementById("applied_date").value,
+                round: document.getElementById("round").value,
+                status: document.getElementById("status").value
+            };
+
+            try {
+                const response = await fetch(
+                    id ? "/api/applications/" + id : "/api/applications",
+                    {
+                        method: id ? "PUT" : "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(application)
+                    }
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message || "Could not save application."
+                    );
+                }
+
+                showMessage(
+                    data.message || "Application saved successfully."
+                );
+                resetForm();
+                await loadApplications();
+            } catch (error) {
+                showMessage(error.message);
+            }
+        });
+
+        cancelButton.addEventListener("click", () => {
+            resetForm();
+            showMessage("Edit cancelled.");
+        });
+
+        document.getElementById("refreshApplications")
+            .addEventListener("click", loadApplications);
+
+        loadOptions();
+        loadApplications();
+    </script>
+
+</body>
+</html>
